@@ -1,0 +1,1287 @@
+import { Button, LineEdit, ComboBox, SpinBox, TextEdit, Switch, ListView, Palette } from "std-widgets.slint";
+
+export struct EntryView {
+    id: string,
+    title: string,
+    subtitle: string,
+    initial: string,
+    code: string,
+    prev-code: string,
+    next-code: string,
+    remaining: int,
+    progress: float,
+    meta: string,
+    revealed: bool,
+    secret: string,
+    uri: string,
+    error: string,
+}
+
+// Material 3 roles that the std Palette does not expose.
+global Theme {
+    out property <bool> dark: Palette.color-scheme == ColorScheme.dark;
+    out property <color> primary: dark ? #D0BCFF : #6750A4;
+    out property <color> on-primary: dark ? #381E72 : #FFFFFF;
+    out property <color> primary-container: dark ? #4F378B : #EADDFF;
+    out property <color> on-primary-container: dark ? #EADDFF : #21005D;
+    out property <color> card: dark ? #211F26 : #F3EDF7;
+    out property <color> card-high: dark ? #2B2930 : #ECE6F0;
+    out property <color> outline: dark ? #938F99 : #79747E;
+    out property <color> muted: dark ? #CAC4D0 : #49454F;
+    out property <color> danger: dark ? #F2B8B5 : #B3261E;
+    out property <color> success: dark ? #81C995 : #1E6A33;
+    out property <color> warning: dark ? #FFB869 : #8A5100;
+    out property <color> inverse-surface: dark ? #E6E0E9 : #322F35;
+    out property <color> inverse-on-surface: dark ? #322F35 : #F5EFF7;
+    out property <string> mono: "Consolas";
+}
+
+component IconButton inherits Rectangle {
+    in property <image> icon;
+    in property <color> tint: Theme.muted;
+    in property <length> icon-size: 22px;
+    in property <bool> enabled: true;
+    callback clicked;
+    width: 40px;
+    height: 40px;
+    border-radius: self.height / 2;
+    background: !root.enabled ? transparent : ta.pressed ? root.tint.with-alpha(0.16) : ta.has-hover ? root.tint.with-alpha(0.08) : transparent;
+    opacity: root.enabled ? 1 : 0.38;
+    Image {
+        source: root.icon;
+        colorize: root.tint;
+        width: root.icon-size;
+        height: root.icon-size;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+    }
+
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+// M3 outlined / filled-tonal chip used for the time controls.
+component ChipButton inherits Rectangle {
+    in property <string> text;
+    in property <image> icon;
+    in property <bool> has-icon: false;
+    in property <bool> filled: false;
+    in property <color> fg: Palette.foreground;
+    callback clicked;
+    height: 32px;
+    border-radius: 8px;
+    background: root.filled ? root.fg : transparent;
+    border-width: root.filled ? 0 : 1px;
+    border-color: root.fg.with-alpha(0.45);
+    HorizontalLayout {
+        padding-left: root.has-icon ? 8px : 12px;
+        padding-right: 12px;
+        spacing: 6px;
+        alignment: center;
+        if root.has-icon: VerticalLayout {
+            alignment: center;
+            Image {
+                source: root.icon;
+                colorize: root.filled ? Theme.primary-container : root.fg;
+                width: 18px;
+                height: 18px;
+            }
+        }
+        Text {
+            text: root.text;
+            vertical-alignment: center;
+            font-size: 13px;
+            font-weight: 600;
+            color: root.filled ? Theme.primary-container : root.fg;
+        }
+    }
+
+    Rectangle {
+        border-radius: root.border-radius;
+        background: ta.pressed ? root.fg.with-alpha(0.14) : ta.has-hover ? root.fg.with-alpha(0.08) : transparent;
+    }
+
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+component MenuRow inherits Rectangle {
+    in property <string> text;
+    in property <bool> danger: false;
+    in property <bool> enabled: true;
+    callback clicked;
+    height: 44px;
+    background: ta.has-hover && root.enabled ? Palette.foreground.with-alpha(0.08) : transparent;
+    Text {
+        x: 16px;
+        width: parent.width - 32px;
+        height: parent.height;
+        text: root.text;
+        vertical-alignment: center;
+        font-size: 14px;
+        color: !root.enabled ? Theme.muted.with-alpha(0.5) : root.danger ? Theme.danger : Palette.foreground;
+    }
+
+    ta := TouchArea {
+        enabled: root.enabled;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+component MenuDivider inherits Rectangle {
+    height: 9px;
+    Rectangle {
+        y: 4px;
+        height: 1px;
+        background: Theme.outline.with-alpha(0.3);
+    }
+}
+
+component Field inherits VerticalLayout {
+    in property <string> label;
+    spacing: 4px;
+    alignment: start;
+    Text {
+        text: root.label;
+        font-size: 12px;
+        color: Theme.muted;
+    }
+
+    @children
+}
+
+component DialogFrame inherits Rectangle {
+    in property <string> title;
+    in property <length> max-dialog-width: 460px;
+    background: #00000073;
+    TouchArea { }
+
+    Rectangle {
+        width: min(root.width - 32px, root.max-dialog-width);
+        height: min(lay.preferred-height, root.height - 32px);
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        background: Theme.card-high;
+        border-radius: 28px;
+        drop-shadow-blur: 24px;
+        drop-shadow-offset-y: 8px;
+        drop-shadow-color: #00000059;
+        clip: true;
+        lay := VerticalLayout {
+            padding: 24px;
+            spacing: 14px;
+            Text {
+                text: root.title;
+                font-size: 22px;
+                color: Palette.foreground;
+            }
+
+            @children
+        }
+    }
+}
+
+component TimeCard inherits Rectangle {
+    in property <string> unix;
+    in property <string> utc;
+    in property <string> local;
+    in property <string> mode;
+    in property <string> mode-text;
+    in-out property <string> input;
+    callback shift(int);
+    callback freeze-toggle();
+    callback set-time(string);
+    callback live();
+    callback copy-unix();
+    property <color> fg: Theme.on-primary-container;
+    background: Theme.primary-container;
+    border-radius: 24px;
+    VerticalLayout {
+        padding: 18px;
+        spacing: 8px;
+        HorizontalLayout {
+            spacing: 8px;
+            Image {
+                source: @image-url("icons/schedule.svg");
+                colorize: root.fg;
+                width: 18px;
+                height: 18px;
+            }
+
+            Text {
+                text: "UNIX TIMESTAMP";
+                font-size: 12px;
+                font-weight: 700;
+                letter-spacing: 1px;
+                color: root.fg.with-alpha(0.8);
+                vertical-alignment: center;
+            }
+
+            Rectangle { }
+
+            Rectangle {
+                height: 24px;
+                border-radius: 12px;
+                background: root.mode == "live" ? Theme.success : root.mode == "fixed" ? Theme.danger : Theme.warning;
+                HorizontalLayout {
+                    padding-left: 10px;
+                    padding-right: 10px;
+                    Text {
+                        text: root.mode-text;
+                        font-size: 11px;
+                        font-weight: 700;
+                        letter-spacing: 0.5px;
+                        color: Theme.dark ? #1D1B20 : #FFFFFF;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+
+        HorizontalLayout {
+            spacing: 8px;
+            Text {
+                text: root.unix;
+                font-family: Theme.mono;
+                font-size: 36px;
+                font-weight: 700;
+                color: root.fg;
+                vertical-alignment: center;
+            }
+
+            Rectangle { }
+
+            IconButton {
+                icon: @image-url("icons/copy.svg");
+                tint: root.fg;
+                clicked => {
+                    root.copy-unix();
+                }
+            }
+        }
+
+        Text {
+            text: root.utc;
+            font-size: 13px;
+            color: root.fg;
+        }
+
+        Text {
+            text: root.local;
+            font-size: 13px;
+            color: root.fg.with-alpha(0.75);
+        }
+
+        HorizontalLayout {
+            padding-top: 6px;
+            spacing: 6px;
+            ChipButton {
+                text: "−30s";
+                fg: root.fg;
+                clicked => {
+                    root.shift(-30);
+                }
+            }
+
+            ChipButton {
+                text: "−1s";
+                fg: root.fg;
+                clicked => {
+                    root.shift(-1);
+                }
+            }
+
+            ChipButton {
+                text: root.mode == "fixed" ? "Resume" : "Freeze";
+                has-icon: true;
+                icon: root.mode == "fixed" ? @image-url("icons/play.svg") : @image-url("icons/pause.svg");
+                filled: root.mode == "fixed";
+                fg: root.fg;
+                clicked => {
+                    root.freeze-toggle();
+                }
+            }
+
+            ChipButton {
+                text: "+1s";
+                fg: root.fg;
+                clicked => {
+                    root.shift(1);
+                }
+            }
+
+            ChipButton {
+                text: "+30s";
+                fg: root.fg;
+                clicked => {
+                    root.shift(30);
+                }
+            }
+        }
+
+        HorizontalLayout {
+            spacing: 8px;
+            Rectangle {
+                height: 40px;
+                horizontal-stretch: 1;
+                clip: true;
+                border-radius: 8px;
+                background: Palette.background;
+                HorizontalLayout {
+                    padding-left: 12px;
+                    padding-right: 12px;
+                    TextInput {
+                        text <=> root.input;
+                        font-size: 14px;
+                        color: Palette.foreground;
+                        vertical-alignment: center;
+                        single-line: true;
+                        accepted => {
+                            root.set-time(self.text);
+                        }
+                        if self.text == "": Text {
+                            text: "Unix, ISO 8601, +5m, -1h…";
+                            font-size: 14px;
+                            color: Theme.muted.with-alpha(0.7);
+                            vertical-alignment: center;
+                            horizontal-alignment: left;
+                            width: parent.width;
+                            height: parent.height;
+                        }
+                    }
+                }
+            }
+
+            ChipButton {
+                text: "Set";
+                height: 40px;
+                filled: true;
+                fg: root.fg;
+                clicked => {
+                    root.set-time(root.input);
+                }
+            }
+
+            if root.mode != "live": ChipButton {
+                text: "Live";
+                height: 40px;
+                fg: root.fg;
+                clicked => {
+                    root.live();
+                }
+            }
+        }
+    }
+}
+
+component EntryCard inherits Rectangle {
+    in property <EntryView> entry;
+    callback copy-code();
+    callback toggle-secret();
+    callback edit();
+    callback delete();
+    callback copy-secret();
+    callback copy-uri();
+    property <bool> urgent: root.entry.remaining <= 5;
+    background: Theme.card;
+    border-radius: 16px;
+    VerticalLayout {
+        padding: 16px;
+        padding-top: 12px;
+        spacing: 8px;
+        HorizontalLayout {
+            spacing: 12px;
+            Rectangle {
+                width: 40px;
+                height: 40px;
+                border-radius: 20px;
+                background: Theme.primary-container;
+                Text {
+                    text: root.entry.initial;
+                    color: Theme.on-primary-container;
+                    font-size: 18px;
+                    font-weight: 600;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+
+            VerticalLayout {
+                alignment: center;
+                Text {
+                    text: root.entry.title;
+                    font-size: 15px;
+                    font-weight: 600;
+                    color: Palette.foreground;
+                    overflow: elide;
+                }
+
+                if root.entry.subtitle != "": Text {
+                    text: root.entry.subtitle;
+                    font-size: 12px;
+                    color: Theme.muted;
+                    overflow: elide;
+                }
+            }
+
+            IconButton {
+                icon: @image-url("icons/copy.svg");
+                clicked => {
+                    root.copy-code();
+                }
+            }
+
+            IconButton {
+                icon: @image-url("icons/visibility.svg");
+                tint: root.entry.revealed ? Theme.primary : Theme.muted;
+                clicked => {
+                    root.toggle-secret();
+                }
+            }
+
+            IconButton {
+                icon: @image-url("icons/edit.svg");
+                clicked => {
+                    root.edit();
+                }
+            }
+
+            IconButton {
+                icon: @image-url("icons/delete.svg");
+                tint: Theme.danger;
+                clicked => {
+                    root.delete();
+                }
+            }
+        }
+
+        if root.entry.error != "": Text {
+            text: root.entry.error;
+            color: Theme.danger;
+            wrap: word-wrap;
+        }
+
+        if root.entry.error == "": HorizontalLayout {
+            spacing: 12px;
+            Text {
+                text: root.entry.code;
+                font-family: Theme.mono;
+                font-size: 38px;
+                font-weight: 700;
+                letter-spacing: 2px;
+                color: root.urgent ? Theme.danger : Theme.primary;
+                vertical-alignment: center;
+                TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => {
+                        root.copy-code();
+                    }
+                }
+            }
+
+            Rectangle { }
+
+            VerticalLayout {
+                alignment: center;
+                Text {
+                    text: root.entry.remaining + "s";
+                    font-family: Theme.mono;
+                    font-size: 22px;
+                    font-weight: 600;
+                    color: root.urgent ? Theme.danger : Palette.foreground;
+                    horizontal-alignment: right;
+                }
+
+                Text {
+                    text: "remaining";
+                    font-size: 11px;
+                    color: Theme.muted;
+                    horizontal-alignment: right;
+                }
+            }
+        }
+
+        if root.entry.error == "": Rectangle {
+            height: 4px;
+            border-radius: 2px;
+            background: (root.urgent ? Theme.danger : Theme.primary).with-alpha(0.18);
+            Rectangle {
+                x: 0px;
+                width: parent.width * root.entry.progress;
+                height: parent.height;
+                border-radius: 2px;
+                background: root.urgent ? Theme.danger : Theme.primary;
+            }
+        }
+
+        if root.entry.error == "": HorizontalLayout {
+            spacing: 16px;
+            Text {
+                text: "prev  " + root.entry.prev-code;
+                font-family: Theme.mono;
+                font-size: 13px;
+                color: Theme.muted;
+            }
+
+            Text {
+                text: "next  " + root.entry.next-code;
+                font-family: Theme.mono;
+                font-size: 13px;
+                color: Theme.muted;
+            }
+
+            Rectangle { }
+        }
+
+        Text {
+            text: root.entry.meta;
+            font-size: 12px;
+            color: Theme.muted;
+            wrap: word-wrap;
+        }
+
+        if root.entry.revealed: VerticalLayout {
+            spacing: 6px;
+            padding-top: 4px;
+            Field {
+                label: "Secret (base32)";
+                HorizontalLayout {
+                    spacing: 4px;
+                    LineEdit {
+                        text: root.entry.secret;
+                        read-only: true;
+                        font-size: 13px;
+                    }
+
+                    IconButton {
+                        icon: @image-url("icons/copy.svg");
+                        clicked => {
+                            root.copy-secret();
+                        }
+                    }
+                }
+            }
+
+            Field {
+                label: "otpauth URI";
+                HorizontalLayout {
+                    spacing: 4px;
+                    LineEdit {
+                        text: root.entry.uri;
+                        read-only: true;
+                        font-size: 13px;
+                    }
+
+                    IconButton {
+                        icon: @image-url("icons/link.svg");
+                        clicked => {
+                            root.copy-uri();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component AppWindow inherits Window {
+    title: "TOTP Tray";
+    icon: @image-url("icons/app.svg");
+    preferred-width: 500px;
+    preferred-height: 820px;
+    min-width: 420px;
+    min-height: 480px;
+    background: Palette.background;
+    // Popup mode: borderless flyout above the tray. Otherwise a normal window.
+    in property <bool> popup-mode;
+    no-frame: root.popup-mode;
+    always-on-top: root.popup-mode;
+
+    in property <[EntryView]> entries;
+    in property <int> total-count;
+
+    in property <string> time-unix;
+    in property <string> time-utc;
+    in property <string> time-local;
+    in property <string> time-mode: "live";
+    in property <string> time-mode-text: "LIVE";
+    in-out property <string> time-input;
+    in-out property <string> filter-text;
+    in property <string> snackbar;
+
+    // "" | "edit" | "import" | "confirm"
+    in-out property <string> dialog;
+
+    in property <string> edit-title;
+    in-out property <string> edit-uri;
+    in-out property <string> edit-name;
+    in-out property <string> edit-issuer;
+    in-out property <string> edit-secret;
+    in-out property <int> edit-encoding;
+    in-out property <int> edit-algorithm;
+    in-out property <int> edit-digits: 6;
+    in-out property <int> edit-period: 30;
+    in property <string> edit-error;
+    in property <string> edit-preview;
+
+    in-out property <string> import-input;
+    in-out property <bool> import-replace;
+    in property <string> import-error;
+
+    in property <string> confirm-title;
+    in property <string> confirm-message;
+    in property <string> confirm-action;
+
+    callback shift-time(int);
+    callback freeze-toggle();
+    callback set-time(string);
+    callback live-time();
+    callback copy-timestamp();
+
+    callback copy-code(string);
+    callback copy-secret(string);
+    callback copy-uri(string);
+    callback toggle-secret(string);
+    callback edit-entry(string);
+    callback delete-entry(string);
+
+    callback add-entry();
+    callback parse-uri();
+    callback save-entry();
+    callback confirm-accept();
+
+    callback open-import();
+    callback import-submit();
+    callback import-clipboard();
+    callback import-qr-file();
+    callback import-config-file();
+    callback export-config();
+    callback export-uris();
+    callback clear-all();
+    callback filter-changed(string);
+    callback hide-to-tray();
+    callback quit();
+    callback toggle-mode();
+    // Escape with no dialog open.
+    callback escape();
+
+    init => {
+        keys.focus();
+    }
+
+    // Wraps all content so unhandled keys from focused children bubble up here.
+    keys := FocusScope {
+        key-pressed(event) => {
+            if event.text == Key.Escape {
+                if root.dialog != "" {
+                    root.dialog = "";
+                } else {
+                    root.escape();
+                }
+                return accept;
+            }
+            reject
+        }
+
+    VerticalLayout {
+        // Top app bar
+        HorizontalLayout {
+            height: 68px;
+            padding-left: 20px;
+            padding-right: 8px;
+            spacing: 2px;
+            VerticalLayout {
+                alignment: center;
+                Text {
+                    text: "TOTP Tray";
+                    font-size: 22px;
+                    color: Palette.foreground;
+                }
+
+                Text {
+                    text: root.total-count == 1 ? "1 entry" : root.total-count + " entries";
+                    font-size: 12px;
+                    color: Theme.muted;
+                }
+            }
+
+            Rectangle { }
+
+            VerticalLayout {
+                alignment: center;
+                IconButton {
+                    icon: @image-url("icons/upload.svg");
+                    tint: Palette.foreground;
+                    clicked => {
+                        root.open-import();
+                    }
+                }
+            }
+
+            VerticalLayout {
+                alignment: center;
+                IconButton {
+                    icon: @image-url("icons/download.svg");
+                    tint: Palette.foreground;
+                    enabled: root.total-count > 0;
+                    clicked => {
+                        root.export-config();
+                    }
+                }
+            }
+
+            VerticalLayout {
+                alignment: center;
+                IconButton {
+                    icon: root.popup-mode ? @image-url("icons/open_in_new.svg") : @image-url("icons/dock.svg");
+                    tint: Palette.foreground;
+                    clicked => {
+                        root.toggle-mode();
+                    }
+                }
+            }
+
+            VerticalLayout {
+                alignment: center;
+                IconButton {
+                    icon: @image-url("icons/more.svg");
+                    tint: Palette.foreground;
+                    clicked => {
+                        menu.show();
+                    }
+                }
+            }
+        }
+
+        VerticalLayout {
+            padding-left: 16px;
+            padding-right: 16px;
+            padding-bottom: 8px;
+            TimeCard {
+                unix: root.time-unix;
+                utc: root.time-utc;
+                local: root.time-local;
+                mode: root.time-mode;
+                mode-text: root.time-mode-text;
+                input <=> root.time-input;
+                shift(s) => {
+                    root.shift-time(s);
+                }
+                freeze-toggle => {
+                    root.freeze-toggle();
+                }
+                set-time(t) => {
+                    root.set-time(t);
+                }
+                live => {
+                    root.live-time();
+                }
+                copy-unix => {
+                    root.copy-timestamp();
+                }
+            }
+        }
+
+        if root.total-count > 0: HorizontalLayout {
+            padding-left: 16px;
+            padding-right: 16px;
+            padding-top: 4px;
+            padding-bottom: 8px;
+            LineEdit {
+                placeholder-text: "Search entries";
+                text <=> root.filter-text;
+                edited(text) => {
+                    root.filter-changed(text);
+                }
+            }
+        }
+
+        if root.total-count == 0: VerticalLayout {
+            vertical-stretch: 1;
+            alignment: center;
+            padding: 32px;
+            spacing: 12px;
+            Image {
+                source: @image-url("icons/schedule.svg");
+                colorize: Theme.outline;
+                height: 56px;
+            }
+
+            Text {
+                text: "No TOTP entries yet";
+                font-size: 18px;
+                color: Palette.foreground;
+                horizontal-alignment: center;
+            }
+
+            Text {
+                text: "Import otpauth:// URIs, a QR code image or a config file, or add an entry manually with the + button.";
+                font-size: 13px;
+                color: Theme.muted;
+                wrap: word-wrap;
+                horizontal-alignment: center;
+            }
+
+            HorizontalLayout {
+                alignment: center;
+                spacing: 8px;
+                Button {
+                    text: "Import";
+                    primary: true;
+                    clicked => {
+                        root.open-import();
+                    }
+                }
+
+                Button {
+                    text: "Add manually";
+                    clicked => {
+                        root.add-entry();
+                    }
+                }
+            }
+        }
+
+        if root.total-count > 0 && root.entries.length == 0: VerticalLayout {
+            vertical-stretch: 1;
+            alignment: start;
+            padding: 32px;
+            Text {
+                text: "No entries match \"" + root.filter-text + "\"";
+                color: Theme.muted;
+                horizontal-alignment: center;
+            }
+        }
+
+        if root.entries.length > 0: ListView {
+            vertical-stretch: 1;
+            for entry in root.entries: VerticalLayout {
+                padding-left: 16px;
+                padding-right: 16px;
+                padding-bottom: 12px;
+                EntryCard {
+                    entry: entry;
+                    copy-code => {
+                        root.copy-code(entry.id);
+                    }
+                    toggle-secret => {
+                        root.toggle-secret(entry.id);
+                    }
+                    edit => {
+                        root.edit-entry(entry.id);
+                    }
+                    delete => {
+                        root.delete-entry(entry.id);
+                    }
+                    copy-secret => {
+                        root.copy-secret(entry.id);
+                    }
+                    copy-uri => {
+                        root.copy-uri(entry.id);
+                    }
+                }
+            }
+        }
+
+        // Keeps the last card clear of the floating action button.
+        if root.entries.length > 0: Rectangle {
+            height: 8px;
+        }
+    }
+
+    // Floating action button
+    Rectangle {
+        width: 56px;
+        height: 56px;
+        x: parent.width - self.width - 24px;
+        y: parent.height - self.height - 24px;
+        border-radius: 16px;
+        background: fab-ta.pressed ? Theme.primary-container.darker(0.08) : fab-ta.has-hover ? Theme.primary-container.darker(0.04) : Theme.primary-container;
+        drop-shadow-blur: 10px;
+        drop-shadow-offset-y: 4px;
+        drop-shadow-color: #0000004D;
+        Image {
+            source: @image-url("icons/add.svg");
+            colorize: Theme.on-primary-container;
+            width: 24px;
+            height: 24px;
+            x: 16px;
+            y: 16px;
+        }
+
+        fab-ta := TouchArea {
+            mouse-cursor: pointer;
+            clicked => {
+                root.add-entry();
+            }
+        }
+    }
+
+    menu := PopupWindow {
+        x: root.width - self.width - 12px;
+        y: 56px;
+        width: 240px;
+        Rectangle {
+            background: Theme.card-high;
+            border-radius: 6px;
+            drop-shadow-blur: 14px;
+            drop-shadow-offset-y: 4px;
+            drop-shadow-color: #00000050;
+            VerticalLayout {
+                padding-top: 8px;
+                padding-bottom: 8px;
+                MenuRow {
+                    text: "Add entry…";
+                    clicked => {
+                        root.add-entry();
+                    }
+                }
+
+                MenuRow {
+                    text: "Import…";
+                    clicked => {
+                        root.open-import();
+                    }
+                }
+
+                MenuRow {
+                    text: "Export config (JSON)…";
+                    enabled: root.total-count > 0;
+                    clicked => {
+                        root.export-config();
+                    }
+                }
+
+                MenuRow {
+                    text: "Export otpauth URIs (TXT)…";
+                    enabled: root.total-count > 0;
+                    clicked => {
+                        root.export-uris();
+                    }
+                }
+
+                MenuDivider { }
+
+                MenuRow {
+                    text: "Clear all…";
+                    danger: true;
+                    enabled: root.total-count > 0;
+                    clicked => {
+                        root.clear-all();
+                    }
+                }
+
+                MenuDivider { }
+
+                MenuRow {
+                    text: root.popup-mode ? "Open as separate window" : "Dock as tray popup";
+                    clicked => {
+                        root.toggle-mode();
+                    }
+                }
+
+                MenuRow {
+                    text: "Hide to tray";
+                    clicked => {
+                        root.hide-to-tray();
+                    }
+                }
+
+                MenuRow {
+                    text: "Quit";
+                    clicked => {
+                        root.quit();
+                    }
+                }
+            }
+        }
+    }
+
+    if root.dialog == "edit": DialogFrame {
+        title: root.edit-title;
+        Field {
+            label: "otpauth:// URI (optional, fills the fields below)";
+            HorizontalLayout {
+                spacing: 8px;
+                LineEdit {
+                    text <=> root.edit-uri;
+                    placeholder-text: "otpauth://totp/Issuer:account?secret=…";
+                    accepted => {
+                        root.parse-uri();
+                    }
+                }
+
+                Button {
+                    text: "Parse";
+                    clicked => {
+                        root.parse-uri();
+                    }
+                }
+            }
+        }
+
+        HorizontalLayout {
+            spacing: 12px;
+            Field {
+                label: "Account name";
+                LineEdit {
+                    text <=> root.edit-name;
+                    placeholder-text: "alice@example.com";
+                }
+            }
+
+            Field {
+                label: "Issuer";
+                LineEdit {
+                    text <=> root.edit-issuer;
+                    placeholder-text: "ACME";
+                }
+            }
+        }
+
+        HorizontalLayout {
+            spacing: 12px;
+            Field {
+                horizontal-stretch: 3;
+                label: "Secret";
+                LineEdit {
+                    text <=> root.edit-secret;
+                    placeholder-text: "JBSWY3DPEHPK3PXP";
+                }
+            }
+
+            Field {
+                horizontal-stretch: 1;
+                label: "Encoding";
+                ComboBox {
+                    model: ["Base32", "Hex", "ASCII"];
+                    current-index <=> root.edit-encoding;
+                }
+            }
+        }
+
+        HorizontalLayout {
+            spacing: 12px;
+            Field {
+                label: "Algorithm";
+                ComboBox {
+                    model: ["SHA1", "SHA256", "SHA512"];
+                    current-index <=> root.edit-algorithm;
+                }
+            }
+
+            Field {
+                label: "Digits";
+                SpinBox {
+                    minimum: 1;
+                    maximum: 10;
+                    value <=> root.edit-digits;
+                }
+            }
+
+            Field {
+                label: "Period (s)";
+                SpinBox {
+                    minimum: 1;
+                    maximum: 86400;
+                    value <=> root.edit-period;
+                }
+            }
+        }
+
+        Rectangle {
+            height: 52px;
+            border-radius: 12px;
+            background: Theme.card;
+            HorizontalLayout {
+                padding-left: 16px;
+                padding-right: 16px;
+                Text {
+                    text: "Preview at current timestamp";
+                    font-size: 12px;
+                    color: Theme.muted;
+                    vertical-alignment: center;
+                }
+
+                Rectangle { }
+
+                Text {
+                    text: root.edit-preview;
+                    font-family: Theme.mono;
+                    font-size: 24px;
+                    font-weight: 700;
+                    color: Theme.primary;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        if root.edit-error != "": Text {
+            text: root.edit-error;
+            color: Theme.danger;
+            font-size: 13px;
+            wrap: word-wrap;
+        }
+
+        HorizontalLayout {
+            alignment: end;
+            spacing: 8px;
+            Button {
+                text: "Cancel";
+                clicked => {
+                    root.dialog = "";
+                }
+            }
+
+            Button {
+                text: "Save";
+                primary: true;
+                clicked => {
+                    root.save-entry();
+                }
+            }
+        }
+    }
+
+    if root.dialog == "import": DialogFrame {
+        title: "Import";
+        Text {
+            text: "Paste otpauth:// or otpauth-migration:// (Google Authenticator export) URIs, one per line. QR codes from the clipboard or an image file are decoded into this box.";
+            font-size: 13px;
+            color: Theme.muted;
+            wrap: word-wrap;
+        }
+
+        TextEdit {
+            height: 150px;
+            font-size: 12px;
+            text <=> root.import-input;
+        }
+
+        HorizontalLayout {
+            spacing: 8px;
+            Button {
+                text: "From clipboard";
+                clicked => {
+                    root.import-clipboard();
+                }
+            }
+
+            Button {
+                text: "QR image…";
+                clicked => {
+                    root.import-qr-file();
+                }
+            }
+
+            Button {
+                text: "Config file…";
+                clicked => {
+                    root.import-config-file();
+                }
+            }
+        }
+
+        Switch {
+            text: "Config file replaces all existing entries";
+            checked <=> root.import-replace;
+        }
+
+        if root.import-error != "": Text {
+            text: root.import-error;
+            color: Theme.danger;
+            font-size: 13px;
+            wrap: word-wrap;
+        }
+
+        HorizontalLayout {
+            alignment: end;
+            spacing: 8px;
+            Button {
+                text: "Cancel";
+                clicked => {
+                    root.dialog = "";
+                }
+            }
+
+            Button {
+                text: "Import";
+                primary: true;
+                enabled: root.import-input != "";
+                clicked => {
+                    root.import-submit();
+                }
+            }
+        }
+    }
+
+    if root.dialog == "confirm": DialogFrame {
+        title: root.confirm-title;
+        max-dialog-width: 380px;
+        Text {
+            text: root.confirm-message;
+            color: Theme.muted;
+            wrap: word-wrap;
+        }
+
+        HorizontalLayout {
+            alignment: end;
+            spacing: 8px;
+            Button {
+                text: "Cancel";
+                clicked => {
+                    root.dialog = "";
+                }
+            }
+
+            Button {
+                text: root.confirm-action;
+                primary: true;
+                clicked => {
+                    root.confirm-accept();
+                }
+            }
+        }
+    }
+
+    if root.snackbar != "": Rectangle {
+        width: min(root.width - 32px, 460px);
+        height: 48px;
+        x: (root.width - self.width) / 2;
+        y: root.height - self.height - (root.dialog == "" ? 96px : 16px);
+        border-radius: 6px;
+        background: Theme.inverse-surface;
+        drop-shadow-blur: 8px;
+        drop-shadow-offset-y: 3px;
+        drop-shadow-color: #00000040;
+        Text {
+            x: 16px;
+            width: parent.width - 32px;
+            height: parent.height;
+            text: root.snackbar;
+            color: Theme.inverse-on-surface;
+            font-size: 14px;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+    }
+
+    }
+
+    if root.popup-mode: Rectangle {
+        border-width: 1px;
+        border-color: Theme.outline.with-alpha(0.5);
+        border-radius: 8px;
+    }
+}
