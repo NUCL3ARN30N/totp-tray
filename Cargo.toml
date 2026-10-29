@@ -3,6 +3,7 @@ description = "Windows tray tool for inspecting and testing TOTP codes"
 name = "totp-tray"
 version = "0.1.0"
 edition = "2024"
+license = "GPL-3.0-only"
 
 [dependencies]
 arboard = "3.7.0"
